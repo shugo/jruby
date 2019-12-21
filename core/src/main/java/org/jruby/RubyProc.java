@@ -43,6 +43,7 @@ import org.jruby.parser.StaticScope;
 import org.jruby.runtime.Binding;
 import org.jruby.runtime.Block;
 import org.jruby.runtime.BlockBody;
+import org.jruby.runtime.IRBlockBody;
 import org.jruby.runtime.ClassIndex;
 import org.jruby.runtime.Helpers;
 import org.jruby.runtime.ObjectAllocator;
@@ -95,6 +96,9 @@ public class RubyProc extends RubyObject implements DataType {
         procClass.setReifiedClass(RubyProc.class);
 
         procClass.defineAnnotatedMethods(RubyProc.class);
+
+        RubyModule refinements = procClass.defineModuleUnder("Refinements");
+        runtime.setProcRefinements(refinements);
 
         return procClass;
     }
@@ -413,6 +417,24 @@ public class RubyProc extends RubyObject implements DataType {
     @Deprecated
     public final IRubyObject call(ThreadContext context, IRubyObject[] args, IRubyObject self, Block passedBlock) {
         return block.call(context, args, passedBlock);
+    }
+
+    @JRubyMethod(name = "using", required = 1)
+    public IRubyObject using(ThreadContext context, IRubyObject refinedModule) {
+        BlockBody body = block.getBody();
+        if (!(body instanceof IRBlockBody)) {
+            throw context.getRuntime().newRuntimeError("Proc#using is available only for Ruby-level proc");
+        }
+
+        StaticScope scope = body.getStaticScope();
+        if (!scope.procRefinementsEnabled()) {
+            throw context.getRuntime().newRuntimeError("`using Proc::Refinements` should be called before the given block");
+        }
+
+        RubyModule overlayModule = scope.getOverlayModuleForWrite(context);
+        RubyModule.usingModule(context, overlayModule, refinedModule);
+
+        return this;
     }
 
 }

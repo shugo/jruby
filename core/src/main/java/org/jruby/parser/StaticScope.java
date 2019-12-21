@@ -126,6 +126,8 @@ public class StaticScope implements Serializable {
 
     private volatile MethodHandle constructor;
 
+    private boolean procRefinementsEnabled = false;
+
     public enum Type {
         LOCAL, BLOCK, EVAL;
 
@@ -722,5 +724,17 @@ public class StaticScope implements Serializable {
             overlayModule = omod = RubyModule.newModule(context.runtime);
         }
         return omod;
+    }
+
+    public void enableProcRefinements() {
+        procRefinementsEnabled = true;
+    }
+
+    public boolean procRefinementsEnabled() {
+        for (StaticScope scope = this; scope != null; scope = scope.getEnclosingScope()) {
+            if (scope.procRefinementsEnabled)
+                return true;
+        }
+        return false;
     }
 }

@@ -37,6 +37,7 @@ import org.jruby.runtime.Block;
 import org.jruby.runtime.ThreadContext;
 import org.jruby.runtime.Visibility;
 import org.jruby.runtime.builtin.IRubyObject;
+import org.jruby.parser.StaticScope;
 
 /**
  * 
@@ -110,7 +111,11 @@ public final class TopSelfFactory {
             @Override
             public IRubyObject call(ThreadContext context, IRubyObject self, RubyModule clazz, String name, IRubyObject[] args) {
                 Arity.checkArgumentCount(context.runtime, args, 1, 1);
-                RubyModule cref = context.getCurrentStaticScope().getOverlayModuleForWrite(context);
+                StaticScope scope = context.getCurrentStaticScope();
+                if (args[0] == context.getRuntime().getProcRefinements()) {
+                    scope.enableProcRefinements();
+                }
+                RubyModule cref = scope.getOverlayModuleForWrite(context);
                 // unclear what the equivalent check would be for us
 //                rb_control_frame_t * prev_cfp = previous_frame(GET_THREAD());
 //

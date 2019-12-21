@@ -2157,6 +2157,13 @@ public final class Ruby implements Constantizable {
         this.procSysModule = procSysModule;
     }
 
+    public RubyModule getProcRefinements() {
+        return procRefinementsModule;
+    }
+    void setProcRefinements(RubyModule procRefinementsModule) {
+        this.procRefinementsModule = procRefinementsModule;
+    }
+
     public RubyModule getPrecision() {
         return precisionModule;
     }
@@ -5205,6 +5212,7 @@ public final class Ruby implements Constantizable {
     private final RubyModule warningModule;
 
     private RubyModule etcModule;
+    private RubyModule procRefinementsModule;
     private RubyModule procUIDModule;
     private RubyModule procGIDModule;
     private RubyModule procSysModule;
