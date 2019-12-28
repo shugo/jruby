@@ -843,6 +843,9 @@ public class RubyModule extends RubyObject {
 
         // I pass the cref even though I don't need to so that the concept is simpler to read
         StaticScope staticScope = context.getCurrentStaticScope();
+        if (refinedModule == context.getRuntime().getProcRefinements()) {
+            staticScope.enableProcRefinements();
+        }
         RubyModule overlayModule = staticScope.getOverlayModuleForWrite(context);
         usingModule(context, overlayModule, refinedModule);
 
