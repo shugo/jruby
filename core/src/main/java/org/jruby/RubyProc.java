@@ -431,7 +431,7 @@ public class RubyProc extends RubyObject implements DataType {
 
         BlockBody body = block.getBody();
         if (fromMethod || !(body instanceof IRBlockBody)) {
-            throw argumentError(context, "can't create a refinements-aware proc from this proc");
+            throw argumentError(context, "can't apply refinements to a Proc without a Ruby block");
         }
 
         RubyModule[] modules = new RubyModule[args.length];
