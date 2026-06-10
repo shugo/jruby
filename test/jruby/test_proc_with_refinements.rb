@@ -25,6 +25,15 @@ class TestProcWithRefinements < Test::Unit::TestCase
     end
   end
 
+  # A second String#shout refinement with a different result, used to tell which refinement set is active.
+  module StringRefinement2
+    refine String do
+      def shout
+        downcase + "?"
+      end
+    end
+  end
+
   def test_refinement_applies
     prc = ->(s) { s.shout }
     refined = prc.with_refinements(StringRefinement)
@@ -93,6 +102,54 @@ class TestProcWithRefinements < Test::Unit::TestCase
     obj = Object.new
     def obj.foo(s); s; end
     assert_raise(ArgumentError) { obj.method(:foo).to_proc.with_refinements(StringRefinement) }
+  end
+
+  # Chaining would need merge-or-replace semantics for the refinement sets; both are confusing, so a refined
+  # proc rejects further with_refinements.  Multiple modules can be activated by passing them in a single call.
+  def test_chain_rejected
+    refined = ->(s) { s.shout }.with_refinements(StringRefinement)
+    assert_raise(ArgumentError) { refined.with_refinements(StringRefinement2) }
+    # the refinement state survives dup/clone, so those are rejected too
+    assert_raise(ArgumentError) { refined.dup.with_refinements(StringRefinement2) }
+    assert_raise(ArgumentError) { refined.clone.with_refinements(StringRefinement2) }
+    # the receiver remains usable
+    assert_equal("HI!", refined.call("hi"))
+  end
+
+  # A method is invoked against its method entry, not the proc's refinement scope, so defining a method from a
+  # with_refinements proc would silently drop the refinements; it is rejected instead.
+  def test_define_method_rejected
+    refined = ->(s) { s.shout }.with_refinements(StringRefinement)
+    assert_raise(ArgumentError) { Class.new { define_method(:m, refined) } }
+    assert_raise(ArgumentError) { Class.new { define_method(:m, &refined) } }
+    assert_raise(ArgumentError) { Object.new.define_singleton_method(:m, refined) }
+    # an ordinary proc is still accepted
+    assert_nothing_raised { Class.new { define_method(:m) { 1 } } }
+  end
+
+  # instance_eval/instance_exec/class_eval run the block under the proc's refinements (the refinement scope is
+  # carried on the proc), and a second proc derived from the same source still sees the refinement.
+  def test_instance_and_module_eval
+    refined = proc { self.shout }.with_refinements(StringRefinement)
+    assert_equal("HI!", "hi".instance_eval(&refined))
+    assert_equal("HI!", "hi".instance_exec(&refined))
+    body = proc { "ok".shout }.with_refinements(StringRefinement)
+    assert_equal("OK!", Class.new.class_eval(&body))
+    again = proc { "ok".shout }.with_refinements(StringRefinement)
+    assert_equal("OK!", Class.new.class_eval(&again))
+    # the original proc is unaffected
+    assert_raise(NoMethodError) { "hi".instance_eval(&proc { self.shout }) }
+  end
+
+  # A /o (once) regexp literal interpolating a refined-method call is built under the refinement, and the clone's
+  # once cache is independent of the source proc's.
+  def test_once_regexp
+    refined = ->(s) { /\A#{s.shout}\z/o }.with_refinements(StringRefinement)
+    r1 = refined.call("ab")
+    assert_equal('\AAB!\z', r1.source)
+    assert_same(r1, refined.call("zz")) # /o caches the first regexp on the clone's own once entry
+    # the original proc has no refinement, so building the regexp raises
+    assert_raise(NoMethodError) { ->(s) { /\A#{s.shout}\z/o }.call("ab") }
   end
 
   # A refinement-aware clone is grafted under an already-built enclosing scope, so it needs its own full IR

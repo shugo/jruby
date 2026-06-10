@@ -434,6 +434,13 @@ public class RubyProc extends RubyObject implements DataType {
             throw argumentError(context, "can't apply refinements to a Proc without a Ruby block");
         }
 
+        // Chaining is not allowed: combining refinement sets raises ordering and precedence questions that are better
+        // avoided.  Activate multiple modules by passing them all in a single call instead.  Rejecting now also keeps
+        // the option open to give chaining a meaning later without breaking compatibility.
+        if (((IRBlockBody) body).getScope().isRefinementsClone()) {
+            throw argumentError(context, "can't apply refinements to a Proc that already has refinements");
+        }
+
         RubyModule[] modules = new RubyModule[args.length];
         for (int i = 0; i < args.length; i++) {
             modules[i] = castAsModule(context, args[i]);

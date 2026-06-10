@@ -381,6 +381,7 @@ public class IRClosure extends IRScope {
         if (refinementsScope != null) {
             refinementsScope.setIRScope(clonedClosure);
             clonedClosure.setIsMaybeUsingRefinements();
+            clonedClosure.refinementsClone = true;
         }
 
         // WrappedIRClosure should always have a single unique IRClosure in them so we should
@@ -416,6 +417,18 @@ public class IRClosure extends IRScope {
     }
 
     private volatile RefinementsCache refinementsCache;
+
+    /**
+     * True on a closure produced by {@link #cloneForRefinements} (i.e. one backing a Proc#with_refinements proc).
+     * Used to reject chaining with_refinements and to reject defining a method from such a proc, both of which would
+     * not carry the refinements through correctly (the refinements live on this clone's scope, not in the captured
+     * environment or a bmethod's method entry).
+     */
+    private boolean refinementsClone;
+
+    public boolean isRefinementsClone() {
+        return refinementsClone;
+    }
 
     /**
      * Return a refinement-aware clone of this closure for the given modules, reusing the cached clone when the same
