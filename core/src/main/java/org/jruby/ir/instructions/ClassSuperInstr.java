@@ -48,7 +48,7 @@ public class ClassSuperInstr extends CallInstr {
     public Instr clone(CloneInfo ii) {
         return new ClassSuperInstr(ii.getScope(), ii.getRenamedVariable(getResult()), getDefiningModule().cloneForInlining(ii),
                 name, cloneCallArgs(ii), getClosureArg().cloneForInlining(ii),
-                getFlags(), isPotentiallyRefined() || ii.isRefinementsClone());
+                getFlags(), isPotentiallyRefined());
     }
 
     public static ClassSuperInstr decode(IRReaderDecoder d) {

@@ -61,7 +61,7 @@ public class UnresolvedSuperInstr extends CallInstr {
         return new UnresolvedSuperInstr(ii.getScope(), Operation.UNRESOLVED_SUPER, ii.getRenamedVariable(getResult()),
                 getReceiver().cloneForInlining(ii), cloneCallArgs(ii),
                 getClosureArg().cloneForInlining(ii), getFlags(),
-                isPotentiallyRefined() || ii.isRefinementsClone());
+                isPotentiallyRefined());
     }
 
     public static UnresolvedSuperInstr decode(IRReaderDecoder d) {
