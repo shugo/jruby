@@ -144,15 +144,9 @@ public abstract class IRScope implements ParseResult {
     private boolean needsCodeCoverage;
     private boolean usesEval;
 
-    // Used by cloning code for inlining
-    protected IRScope(IRScope s, IRScope lexicalParent) {
-        this(s, lexicalParent, s.staticScope);
-    }
-
     /**
-     * Copy constructor variant that uses a caller-supplied StaticScope instead of sharing the source scope's.  This is
-     * used by Proc#with_refinements cloning, which must give each cloned scope its own StaticScope so a refinements
-     * overlay can be attached without mutating the original.
+     * Copy constructor used by cloning code (inlining shares the source's StaticScope; Proc#with_refinements cloning
+     * supplies a fresh one so a refinements overlay can be attached without mutating the original).
      */
     protected IRScope(IRScope s, IRScope lexicalParent, StaticScope staticScope) {
         this.lexicalParent = lexicalParent;

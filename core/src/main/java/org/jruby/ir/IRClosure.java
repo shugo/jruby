@@ -76,13 +76,8 @@ public class IRClosure extends IRScope {
     /** Used by cloning code for inlining */
     /* Inlining generates a new name and id and basic cloning will reuse the originals name */
     protected IRClosure(IRClosure c, IRScope lexicalParent, int closureId, ByteList fullName) {
-        super(c, lexicalParent);
-        this.closureId = closureId;
-        super.setByteName(fullName);
-
-        isEND = c.isEND;
-
-        this.signature = c.signature;
+        // Inlining clones share the source's StaticScope.
+        this(c, lexicalParent, closureId, fullName, c.getStaticScope());
     }
 
     /** Used by Proc#with_refinements cloning, which needs each clone to own a fresh StaticScope. */
