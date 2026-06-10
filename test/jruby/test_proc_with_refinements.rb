@@ -1,4 +1,6 @@
 require 'test/unit'
+require 'test/jruby/test_helper'
+require 'tempfile'
 
 # Tests for Proc#with_refinements (bugs.ruby-lang.org #16461).
 #
@@ -6,6 +8,7 @@ require 'test/unit'
 # active.  The receiver is unchanged and the captured closure environment is shared; only the refinement
 # scope differs.
 class TestProcWithRefinements < Test::Unit::TestCase
+  include TestHelper
   module StringRefinement
     refine String do
       def shout
@@ -90,5 +93,33 @@ class TestProcWithRefinements < Test::Unit::TestCase
     obj = Object.new
     def obj.foo(s); s; end
     assert_raise(ArgumentError) { obj.method(:foo).to_proc.with_refinements(StringRefinement) }
+  end
+
+  # A refinement-aware clone is grafted under an already-built enclosing scope, so it needs its own full IR
+  # built before it can be JIT-compiled.  Run in a subprocess with a low JIT threshold and synchronous (non
+  # background) compilation so both the original and the clone cross the threshold deterministically.  We
+  # assert two things: the refinement still produces correct results after JIT (and the original is
+  # unaffected), and -- crucially for guarding the fix -- that the clone did not hit "JIT failed".  Without
+  # the fix the clone cannot build its full IR and falls back to the interpreter, which is still correct, so
+  # the JIT log is what distinguishes a working fix from a silent regression.
+  def test_refinement_survives_jit
+    script = <<~'RUBY'
+      module R
+        refine(String) { def upcase; "REFINED"; end }
+      end
+      prc = ->(s) { s.upcase }
+      1000.times { exit(1) unless prc.call("hi") == "HI" }       # JIT the original (bare upcase) first
+      refined = prc.with_refinements(R)
+      1000.times { exit(2) unless refined.call("hi") == "REFINED" } # drive the clone past the threshold
+      exit(3) unless prc.call("hi") == "HI"                      # original must stay unaffected post-JIT
+      print "OK"
+    RUBY
+    Tempfile.create(['jit_refine', '.rb']) do |f|
+      f.write(script)
+      f.flush
+      out = jruby("-Xjit.threshold=10 -Xjit.background=false -Xjit.logging #{f.path} 2>&1")
+      assert_include out, "OK", "refinement-aware proc produced wrong results under JIT"
+      assert_not_include out, "JIT failed", "refinement-aware clone could not be JIT-compiled"
+    end
   end
 end
