@@ -456,6 +456,12 @@ public class IRClosure extends IRScope {
         if (cache != null && cache.matches(modules)) return cache.clone;
 
         IRClosure clone = cloneForRefinements(context, modules);
+        // Build the clone's BlockBody now, before publishing it through the (volatile) cache, so a thread that later
+        // reads the shared clone on a cache hit sees a fully-built body (via the publish's happens-before) and never
+        // races another thread to create a second one in the lazy getBlockBody().  with_refinements requests the body
+        // on the very next line, so this is not extra work, and it keeps getBlockBody()'s hot path (one per block
+        // instantiation, for all closures) lock- and volatile-free.
+        clone.getBlockBody();
         refinementsCache = new RefinementsCache(modules, clone);
 
         return clone;
