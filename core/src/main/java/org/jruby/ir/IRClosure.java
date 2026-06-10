@@ -386,7 +386,19 @@ public class IRClosure extends IRScope {
 
         // WrappedIRClosure should always have a single unique IRClosure in them so we should
         // not end up adding n copies of the same closure as distinct clones...
-        lexicalParent.addClosure(clonedClosure);
+        //
+        // Exception: the TOP clone of a Proc#with_refinements tree is grafted under the source's real (shared,
+        // long-lived) lexical parent.  Registering it in that parent's nestedClosures would (a) race with concurrent
+        // with_refinements calls and with JIT-time iteration on the unsynchronized list, and (b) permanently retain
+        // every discarded clone in the shared parent (memory leak).  The clone needs only its lexicalParent *field*
+        // (set by the constructor, used by getNearestTopLocalVariableScope at build time), not a back-reference from
+        // the parent.  Nested clones, whose parent is itself a clone we own, are registered normally so the clone's
+        // own build can reach them via getClosures().
+        boolean graftedTopRefinementsClone = ii.isRefinementsClone() &&
+                !(lexicalParent instanceof IRClosure && ((IRClosure) lexicalParent).isRefinementsClone());
+        if (!graftedTopRefinementsClone) {
+            lexicalParent.addClosure(clonedClosure);
+        }
 
         return cloneForInlining(ii, clonedClosure);
     }
@@ -468,6 +480,12 @@ public class IRClosure extends IRScope {
         SimpleCloneInfo ii = new SimpleCloneInfo(getLexicalParent(), false, false, true);
         IRClosure clone = cloneForInlining(ii);
         clone.setArgumentDescriptors(getArgumentDescriptors());
+
+        // The IRScope constructor registered the clone in its lexical parent's child-scope list (read only by AOT
+        // persistence).  Detach the grafted top clone so the shared parent does not retain it; the synchronized
+        // remove matches addChildScope and is safe against concurrent with_refinements calls (each removes its own
+        // distinct clone).  cloneForInlining already skips the parent's nestedClosures for this clone.
+        clone.getLexicalParent().removeChildScope(clone);
 
         // Activate the requested refinements on the clone's own overlay module so refined call sites resolve them.
         RubyModule overlay = clone.getStaticScope().getOverlayModuleForWrite(context);

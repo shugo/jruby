@@ -1,6 +1,7 @@
 require 'test/unit'
 require 'test/jruby/test_helper'
 require 'tempfile'
+require 'jruby'
 
 # Tests for Proc#with_refinements (bugs.ruby-lang.org #16461).
 #
@@ -139,6 +140,26 @@ class TestProcWithRefinements < Test::Unit::TestCase
     assert_equal("OK!", Class.new.class_eval(&again))
     # the original proc is unaffected
     assert_raise(NoMethodError) { "hi".instance_eval(&proc { self.shout }) }
+  end
+
+  # Each with_refinements clone is grafted under the SOURCE proc's (shared, long-lived) lexical parent, but it must
+  # not be registered in that parent's nested-closure / lexical-child lists: doing so would retain every discarded
+  # clone forever (memory leak) and race with concurrent calls on those unsynchronized/AOT lists.  Drive many
+  # cache-missing clones (distinct module each time) and assert the parent's lists do not grow.
+  def test_clones_not_retained_by_lexical_parent
+    prc = ->(s) { s.to_s }
+    closure = JRuby.reference(prc).get_block.get_body.get_scope
+    parent = closure.get_lexical_parent
+    before_closures = parent.get_closures.size
+    before_children = parent.get_lexical_scopes.size
+    200.times do
+      mod = Module.new { refine(String) { def to_s; "x"; end } }
+      prc.with_refinements(mod).call("hi")
+    end
+    assert_operator parent.get_closures.size - before_closures, :<=, 1,
+                    "with_refinements clones accumulated in the source's parent nestedClosures"
+    assert_operator parent.get_lexical_scopes.size - before_children, :<=, 1,
+                    "with_refinements clones accumulated in the source's parent lexicalChildren"
   end
 
   # A /o (once) regexp literal interpolating a refined-method call is built under the refinement, and the clone's

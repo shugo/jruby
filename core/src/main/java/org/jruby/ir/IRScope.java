@@ -224,6 +224,10 @@ public abstract class IRScope implements ParseResult {
         lexicalChildren.add(scope);
     }
 
+    protected synchronized void removeChildScope(IRScope scope) {
+        lexicalChildren.remove(scope);
+    }
+
     public synchronized List<IRScope> getLexicalScopes() {
         return lexicalChildren;
     }
